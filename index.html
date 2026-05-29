@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBA 球员雷达图 — 12 轴 · 位置模板 · 多模式对比</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #f8f9fa;
+      --border: #dee2e6;
+      --text: #1a1a2e;
+      --muted: #6c757d;
+      --accent: #f97316;
+      --accent2: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 0.9rem;
+    }
+
+    /* ── controls ── */
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 140px;
+    }
+
+    .field label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .field select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      max-width: 200px;
+    }
+
+    .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 2px;
+      background: #e9ecef;
+      border-radius: 8px;
+      padding: 3px;
+      margin-left: auto;
+    }
+
+    .mode-tab {
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .mode-tab:hover:not(.active) {
+      color: var(--text);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--accent2);
+      color: #fff;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    .badge.warn {
+      background: var(--red);
+    }
+
+    /* ── chart ── */
+    .chart-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px;
+      height: 520px;
+      position: relative;
+    }
+
+    #chart { width: 100%; height: 100%; }
+
+    .chart-note {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 4px 12px;
+      border-radius: 6px;
+      pointer-events: none;
+    }
+
+    /* ── stat cards ── */
+    .cards-wrap {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .player-photo {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--border);
+      flex-shrink: 0;
+      background: #e9ecef;
+    }
+
+    .player-photo-placeholder {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card .meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin: 2px 0 10px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.82rem;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+
+    .stat-bar {
+      flex: 1;
+      max-width: 100px;
+      height: 5px;
+      background: #e9ecef;
+      border-radius: 3px;
+      margin: 0 10px;
+      overflow: hidden;
+    }
+
+    .stat-bar span {
+      display: block;
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .stat-val {
+      width: 26px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    /* ── axis info ── */
+    .axis-info {
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .axis-info .active-axes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .axis-info .axis-tag {
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text);
+    }
+
+    .axis-info .axis-tag.inactive {
+      opacity: 0.35;
+      text-decoration: line-through;
+    }
+
+    /* ── season stats ── */
+    .season-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px 10px;
+      margin: 12px 0;
+      padding: 10px 12px;
+      background: #f1f3f5;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .ss-cell {
+      text-align: center;
+    }
+
+    .ss-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .ss-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 8px 0 4px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>NBA 球员雷达图</h1>
+      <p>12 轴能力池 · 位置模板 10 轴 · 同/异位置自动适配 · 1v1 / 多人 / 历史赛季对比</p>
+    </header>
+
+    <!-- Controls -->
+    <div class="controls" id="controls">
+      <div class="field">
+        <label>模式</label>
+        <div class="mode-tabs" id="modeTabs">
+          <button class="mode-tab active" data-mode="single">单人</button>
+          <button class="mode-tab" data-mode="1v1">1v1</button>
+          <button class="mode-tab" data-mode="multi">多人</button>
+        </div>
+      </div>
+      <div class="field" id="playerFields"></div>
+      <div class="field">
+        <label>时代</label>
+        <select id="eraFilter">
+          <option value="all">全部</option>
+          <option value="current">现役</option>
+          <option value="legends">传奇</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>球队筛选</label>
+        <select id="teamFilter">
+          <option value="all">全部球队</option>
+        </select>
+      </div>
+      <div class="field" style="margin-left:auto;">
+        <label>位置筛选</label>
+        <select id="posFilter">
+          <option value="all">全部位置</option>
+          <option value="PG">PG</option>
+          <option value="SG">SG</option>
+          <option value="SF">SF</option>
+          <option value="PF">PF</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-box">
+      <div id="chart"></div>
+      <div class="chart-note" id="chartNote"></div>
+    </div>
+
+    <!-- Cards -->
+    <div class="cards-wrap" id="cards"></div>
+
+    <!-- Axis info -->
+    <div class="axis-info" id="axisInfo"></div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // 12-Axis Pool
+    // ═══════════════════════════════════════════════════════════
+    const AXIS_POOL = [
+      { key: 'threePT',     name: '三分',       desc: '超远/弧顶三分产量+效率',         icon: '🏀' },
+      { key: 'midRange',    name: '中距离',     desc: '罚球线至三分线内投篮',            icon: '🎯' },
+      { key: 'rimFin',      name: '内线终结',   desc: '禁区得分、扣篮、抛投',            icon: '💪' },
+      { key: 'FT',          name: '罚球',       desc: '造犯规与罚篮稳定性',              icon: '📊' },
+      { key: 'perimD',      name: '外线单防',   desc: '对位后卫/侧翼持球防守',          icon: '🔒' },
+      { key: 'rimProt',     name: '护框',       desc: '护筐、盖帽、干扰投篮',            icon: '🧱' },
+      { key: 'helpSwitch',  name: '协防换防',   desc: '补防、换防、防守轮转',            icon: '🔄' },
+      { key: 'steals',      name: '抢断压迫',   desc: '掏球、压迫对手失误',              icon: '✋' },
+      { key: 'playmaking',  name: '组织',       desc: '助攻、潜在助攻、挡拆决策',        icon: '🧠' },
+      { key: 'ballHandle',  name: '控球',       desc: '失误控制、护球、高压运球',        icon: '⚡' },
+      { key: 'rebounding',  name: '篮板',       desc: '前后场篮板、卡位',                icon: '🔄' },
+      { key: 'athleticism', name: '运动',       desc: '速度/弹跳/力量/耐力',             icon: '🚀' },
+    ];
+
+    const AXIS_KEY_MAP = {};
+    AXIS_POOL.forEach(a => { AXIS_KEY_MAP[a.key] = a; });
+
+    // Position → which 10 axes to show
+    const POS_TEMPLATES = {
+      PG:  ['threePT','midRange','rimFin','FT','playmaking','ballHandle','perimD','helpSwitch','steals','athleticism'],
+      SG:  ['threePT','midRange','rimFin','FT','playmaking','ballHandle','perimD','helpSwitch','steals','athleticism'],
+      SF:  ['threePT','midRange','rimFin','FT','playmaking','ballHandle','perimD','rimProt','helpSwitch','steals','athleticism'],
+      PF:  ['threePT','midRange','rimFin','FT','perimD','rimProt','helpSwitch','steals','rebounding','athleticism'],
+      C:   ['midRange','rimFin','FT','playmaking','perimD','rimProt','helpSwitch','rebounding','athleticism','steals'],
+    };
+
+    // Ensure every template has exactly 10 axes
+    // (SF has 11 per design doc → keep 11; C has 10)
+
+    // ═══════════════════════════════════════════════════════════
+    // State
+    // ═══════════════════════════════════════════════════════════
+    let PLAYERS = [];
+    let mode = 'single';
+    let selectedIds = ['']; // array for multi
+
+    // ═══════════════════════════════════════════════════════════
+    // Load data
+    // ═══════════════════════════════════════════════════════════
+    async function loadData() {
+      try {
+        const res = await fetch('players.json');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        PLAYERS = await res.json();
+      } catch (e) {
+        console.error('Failed to load players.json:', e);
+        document.getElementById('chart').innerHTML =
+          `<div style="display:grid;place-items:center;height:100%;color:var(--red);">
+            加载球员数据失败，请确认 players.json 存在。<br><small>${e.message}</small>
+          </div>`;
+        return;
+      }
+      // Auto-select first player
+      if (PLAYERS.length > 0 && selectedIds[0] === '') {
+        selectedIds = [PLAYERS[0].id];
+      }
+      initUI();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Determine which axes to display
+    // ═══════════════════════════════════════════════════════════
+    function getActiveAxes(players) {
+      if (players.length === 0) return AXIS_POOL.map(a => a.key);
+
+      const positions = [...new Set(players.map(p => p.position).filter(Boolean))];
+      if (positions.length === 0) return AXIS_POOL.map(a => a.key);
+
+      // Same position → use template
+      if (positions.length === 1) {
+        const tmpl = POS_TEMPLATES[positions[0]];
+        if (tmpl) return tmpl;
+      }
+
+      // Different positions → 12-axis full
+      return AXIS_POOL.map(a => a.key);
+    }
+
+    function isCrossPosition(players) {
+      const positions = [...new Set(players.map(p => p.position).filter(Boolean))];
+      return positions.length > 1;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // UI
+    // ═══════════════════════════════════════════════════════════
+    function initUI() {
+      // Mode tabs
+      document.querySelectorAll('.mode-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          mode = tab.dataset.mode;
+          if (mode === 'multi') {
+            selectedIds = [selectedIds[0] || PLAYERS[0]?.id || ''].filter(Boolean);
+            while (selectedIds.length < 2) selectedIds.push('');
+          } else if (mode === '1v1') {
+            // Ensure exactly 2
+            const kept = selectedIds[0] || PLAYERS[0]?.id || '';
+            selectedIds = [kept, ''];
+          } else {
+            selectedIds = [selectedIds[0] || PLAYERS[0]?.id || ''];
+          }
+          renderPlayerSelects();
+          updateChart();
+        });
+      });
+
+      document.getElementById('posFilter').addEventListener('change', () => {
+        renderPlayerSelects();
+        updateChart();
+      });
+      document.getElementById('eraFilter').addEventListener('change', () => {
+        renderPlayerSelects();
+        updateChart();
+      });
+      document.getElementById('teamFilter').addEventListener('change', () => {
+        renderPlayerSelects();
+        updateChart();
+      });
+
+      // Populate team filter dynamically
+      const teams = [...new Set(PLAYERS.map(p => p.team).filter(Boolean))].sort();
+      const teamSel = document.getElementById('teamFilter');
+      teams.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        teamSel.appendChild(opt);
+      });
+
+      renderPlayerSelects();
+      updateChart();
+    }
+
+    function getFilteredPlayers() {
+      const posFilter = document.getElementById('posFilter')?.value || 'all';
+      const eraFilter = document.getElementById('eraFilter')?.value || 'all';
+      const teamFilter = document.getElementById('teamFilter')?.value || 'all';
+      let result = PLAYERS;
+      if (posFilter !== 'all') result = result.filter(p => p.position === posFilter);
+      if (eraFilter === 'current') result = result.filter(p => !p.season);
+      if (eraFilter === 'legends') result = result.filter(p => p.season);
+      if (teamFilter !== 'all') result = result.filter(p => p.team === teamFilter);
+      return result;
+    }
+
+    function renderPlayerSelects() {
+      const container = document.getElementById('playerFields');
+      const filtered = getFilteredPlayers();
+      const firstId = filtered[0]?.id || '';
+
+      // Reset selections that don't exist in filtered list
+      selectedIds = selectedIds.map(id => filtered.some(p => p.id === id) ? id : '');
+
+      if (mode === 'single') {
+        if (selectedIds.length !== 1 || !selectedIds[0]) selectedIds = [firstId];
+      } else if (mode === '1v1') {
+        if (selectedIds.length !== 2) selectedIds = [selectedIds[0] || firstId, ''];
+        if (!selectedIds[0]) selectedIds[0] = firstId;
+        if (!selectedIds[1]) selectedIds[1] = firstId !== selectedIds[0] ? firstId : (filtered[1]?.id || '');
+      } else if (mode === 'multi') {
+        if (selectedIds.length < 2) {
+          selectedIds = [firstId];
+          while (selectedIds.length < Math.min(4, filtered.length || 2)) selectedIds.push('');
+        }
+        selectedIds = selectedIds.map((id, i) => id || (i === 0 ? firstId : ''));
+      }
+
+      const labels = mode === 'single' ? ['球员'] : mode === '1v1' ? ['球员 A', '球员 B'] :
+        selectedIds.map((_, i) => `球员 ${String.fromCharCode(65 + i)}`);
+
+      container.innerHTML = labels.map((label, i) => {
+        const opts = ['<option value="">-- 选择球员 --</option>']
+          .concat(filtered.map(p => {
+            const seasonTag = p.season ? ` · ${p.season}` : '';
+            const teamTag = p.team ? ` · ${p.team}` : '';
+            return `<option value="${p.id}" ${selectedIds[i] === p.id ? 'selected' : ''}>${p.name} (${p.position})${teamTag}${seasonTag}</option>`;
+          })).join('');
+
+        return `
+          <div class="field">
+            <label>${label}</label>
+            <select data-slot="${i}" class="player-select">${opts}</select>
+          </div>`;
+      }).join('');
+
+      if (mode === 'multi' && selectedIds.length < 4) {
+        container.innerHTML += `
+          <button id="addPlayerBtn" style="padding:8px 14px;background:var(--accent2);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;">+ 添加球员</button>`;
+        document.getElementById('addPlayerBtn').addEventListener('click', () => {
+          selectedIds.push('');
+          renderPlayerSelects();
+          updateChart();
+        });
+      }
+
+      if (mode === 'multi' && selectedIds.length > 2) {
+        // Add remove buttons
+        const selects = container.querySelectorAll('.player-select');
+        selects.forEach((sel, i) => {
+          if (i >= 2) {
+            const field = sel.closest('.field');
+            const rmBtn = document.createElement('button');
+            rmBtn.textContent = '✕';
+            rmBtn.style.cssText = 'position:absolute;top:0;right:-28px;background:none;border:none;color:var(--red);cursor:pointer;font-size:0.8rem;';
+            field.style.position = 'relative';
+            field.appendChild(rmBtn);
+            rmBtn.addEventListener('click', () => {
+              selectedIds.splice(i, 1);
+              renderPlayerSelects();
+              updateChart();
+            });
+          }
+        });
+      }
+
+      document.querySelectorAll('.player-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+          const slot = parseInt(sel.dataset.slot);
+          selectedIds[slot] = sel.value;
+          updateChart();
+        });
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Chart rendering
+    // ═══════════════════════════════════════════════════════════
+    const chart = echarts.init(document.getElementById('chart'));
+    window.addEventListener('resize', () => chart.resize());
+
+    function getSelectedPlayers() {
+      const filtered = getFilteredPlayers();
+      return selectedIds
+        .map(id => filtered.find(p => p.id === id))
+        .filter(Boolean);
+    }
+
+    function updateChart() {
+      const selPlayers = getSelectedPlayers();
+      if (selPlayers.length === 0) { chart.clear(); return; }
+
+      const axes = getActiveAxes(selPlayers);
+      const crossPos = selPlayers.length > 1 && isCrossPosition(selPlayers);
+      const axisDefs = axes.map(k => AXIS_KEY_MAP[k]).filter(Boolean);
+
+      // Build indicator for ECharts
+      const indicator = axisDefs.map(a => ({
+        name: a.name,
+        max: 99,
+        min: 0,
+      }));
+
+      // Colors
+      const defaultColors = ['#F97316', '#3B82F6', '#3FB950', '#F85149'];
+
+      const series = selPlayers.map((p, i) => ({
+        name: p.name,
+        type: 'radar',
+        symbol: 'circle',
+        symbolSize: 5,
+        lineStyle: { width: 2, color: p.color || defaultColors[i] },
+        areaStyle: {
+          color: p.color || defaultColors[i],
+          opacity: selPlayers.length > 2 ? 0.10 : selPlayers.length > 1 ? 0.16 : 0.26,
+        },
+        itemStyle: { color: p.color || defaultColors[i] },
+        data: [{
+          value: axes.map(k => p.attrs[k] ?? 0),
+          name: p.name,
+        }],
+      }));
+
+      chart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'item',
+          backgroundColor: '#fff',
+          borderColor: '#dee2e6',
+          textStyle: { color: '#1a1a2e' },
+        },
+        legend: {
+          bottom: 4,
+          textStyle: { color: '#6c757d', fontSize: 12 },
+          data: series.map(s => s.name),
+        },
+        radar: {
+          center: ['50%', '47%'],
+          radius: '60%',
+          startAngle: 90,
+          splitNumber: 5,
+          axisName: {
+            color: '#495057',
+            fontSize: 12,
+          },
+          splitLine: { lineStyle: { color: 'rgba(0,0,0,0.12)' } },
+          splitArea: {
+            show: true,
+            areaStyle: {
+              color: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.04)'],
+            },
+          },
+          axisLine: { lineStyle: { color: '#dee2e6' } },
+          indicator,
+        },
+        series,
+      }, true);
+
+      // Update chart note
+      const noteEl = document.getElementById('chartNote');
+      if (crossPos) {
+        noteEl.innerHTML = '⚠ 跨位置对比：使用全 12 轴，与同位置 10 轴图的形状不可直接比较面积';
+        noteEl.style.display = 'block';
+      } else if (selPlayers.length === 1) {
+        noteEl.textContent = `位置模板：${selPlayers[0].position}（${axes.length} 轴）`;
+        noteEl.style.display = 'block';
+      } else {
+        noteEl.textContent = `同位置对比：${selPlayers[0].position} 模板（${axes.length} 轴）`;
+        noteEl.style.display = 'block';
+      }
+
+      // Render cards
+      renderCards(selPlayers, axisDefs);
+
+      // Render axis info
+      renderAxisInfo(selPlayers, axes);
+    }
+
+    function renderCards(players, axisDefs) {
+      const container = document.getElementById('cards');
+      const colors = ['#F97316', '#3B82F6', '#3FB950', '#F85149'];
+
+      container.innerHTML = players.map((p, i) => {
+        const rows = axisDefs.map(a => {
+          const v = p.attrs[a.key] ?? 0;
+          return `
+            <div class="stat-row">
+              <span>${a.icon || ''} ${a.name}</span>
+              <div class="stat-bar"><span style="width:${v}%;background:${p.color || colors[i]}"></span></div>
+              <span class="stat-val">${v}</span>
+            </div>`;
+        }).join('');
+
+        const seasonInfo = p.season ? `<br>赛季：${p.season}` : '';
+        const s = p.stats || {};
+        const statCells = [
+          { label: '得分', value: s.pts != null ? s.pts.toFixed(1) : '—' },
+          { label: '助攻', value: s.ast != null ? s.ast.toFixed(1) : '—' },
+          { label: '篮板', value: s.reb != null ? s.reb.toFixed(1) : '—' },
+          { label: '抢断', value: s.stl != null ? s.stl.toFixed(1) : '—' },
+          { label: '盖帽', value: s.blk != null ? s.blk.toFixed(1) : '—' },
+          { label: 'FG%',  value: s.fg_pct != null ? s.fg_pct.toFixed(1) + '%' : '—' },
+          { label: '3P%',  value: s.tp_pct != null ? s.tp_pct.toFixed(1) + '%' : '—' },
+          { label: 'FT%',  value: s.ft_pct != null ? s.ft_pct.toFixed(1) + '%' : '—' },
+        ];
+        const statsHtml = statCells.map(sc => `
+          <div class="ss-cell">
+            <div class="ss-val">${sc.value}</div>
+            <div class="ss-label">${sc.label}</div>
+          </div>`).join('');
+
+        // Photo or placeholder
+        const initials = p.name.replace(/\(.*?\)/g, '').replace(/[·\-·]/g, '').slice(0, 2);
+        const photoColor = p.color || colors[i] || '#3b82f6';
+        const photoHtml = p.image
+          ? `<img class="player-photo" src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">`
+          : '';
+        const placeholderHtml = `<div class="player-photo-placeholder" style="background:${photoColor};${p.image ? 'display:none;' : ''}">${initials}</div>`;
+
+        return `
+          <div class="card">
+            <div class="card-header">
+              ${photoHtml}${placeholderHtml}
+              <div>
+                <h3 style="margin:0 0 2px;">
+                  <span class="dot" style="background:${p.color || colors[i]}"></span>
+                  ${p.name}
+                </h3>
+                <div class="meta">${p.position} · ${p.team || ''} · ${s.gp || '?'}场${s.mpg ? ' ' + s.mpg + '分钟' : ''}${seasonInfo}</div>
+              </div>
+            </div>
+            <div class="season-stats">${statsHtml}</div>
+            <div class="section-label">能力评分</div>
+            ${rows}
+          </div>`;
+      }).join('');
+    }
+
+    function renderAxisInfo(players, activeAxes) {
+      const container = document.getElementById('axisInfo');
+      const activeSet = new Set(activeAxes);
+      const all12 = AXIS_POOL.map(a => a.key);
+
+      const tags = AXIS_POOL.map(a => {
+        const cls = activeSet.has(a.key) ? 'axis-tag' : 'axis-tag inactive';
+        return `<span class="${cls}" title="${a.desc}">${a.icon || ''} ${a.name}</span>`;
+      }).join('');
+
+      const posInfo = players.length > 0
+        ? `当前显示：${[...new Set(players.map(p => p.position))].join(' vs ')} → ${activeAxes.length} 轴`
+        : '';
+
+      container.innerHTML = `
+        <strong>12 轴能力池</strong>
+        <span style="color:var(--muted);margin-left:8px;">${posInfo}</span>
+        <div class="active-axes">${tags}</div>
+        <div style="margin-top:10px;color:var(--muted);font-size:0.78rem;">
+          高亮 = 当前激活的轴 · 划线 = 当前模板隐藏的轴 · 同位置对比用模板（10轴）· 跨位置对比全开（12轴）
+        </div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Start
+    // ═══════════════════════════════════════════════════════════
+    loadData();
+  </script>
+</body>
+</html>
